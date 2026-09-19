@@ -16,14 +16,17 @@ HEADERS := $(sort $(wildcard include/minios/*.h include/mosvm/*.h))
 APP_SRCS := $(sort $(wildcard apps/*.c))
 TEST_SRCS := $(sort $(wildcard tests/*.c))
 ALL_C_SRCS := $(sort $(wildcard src/*.c))
+EXAMPLE_SRC := examples/example.c
+EXAMPLE_BIN := $(BUILD_DIR)/example
 
-.PHONY: help syntax-check verify-instructor minios test clean $(addprefix demo-lab,$(LABS)) $(addprefix test-lab,$(LABS))
+.PHONY: help syntax-check verify-instructor minios example test clean $(addprefix demo-lab,$(LABS)) $(addprefix test-lab,$(LABS))
 
 help:
 	@printf '%s\n' 'miniOS lab targets:'
 	@printf '  %-20s %s\n' 'make syntax-check' 'Compile-check public headers, src, apps, and tests'
 	@printf '  %-20s %s\n' 'make verify-instructor' 'Run syntax checks and VM runtime tests'
 	@printf '  %-20s %s\n' 'make minios' 'Link the student miniOS executable'
+	@printf '  %-20s %s\n' 'make example' 'Build the standalone LAB0 VM example'
 	@printf '  %-20s %s\n' 'make demo-labNN' 'Build and run one LAB demo, for NN=01..10'
 	@printf '  %-20s %s\n' 'make test-labNN' 'Build and run one public LAB test, for NN=01..10'
 	@printf '  %-20s %s\n' 'make test' 'Run all public LAB tests'
@@ -61,6 +64,12 @@ verify-instructor: syntax-check $(BUILD_DIR)/tests/test_vm_runtime
 
 minios: $(MAIN_OBJ) $(MINIOS_OBJS) $(VM_LIB)
 	$(CC) $(CFLAGS) $(MAIN_OBJ) $(MINIOS_OBJS) $(VM_LIB) -o $(BUILD_DIR)/minios
+
+$(EXAMPLE_BIN): $(EXAMPLE_SRC) $(VM_LIB)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $< $(VM_LIB) -o $@
+
+example: $(EXAMPLE_BIN)
 
 define LAB_RULES
 $(BUILD_DIR)/apps/lab$(1)_demo: apps/lab$(1)_*_demo.c $(MINIOS_OBJS) $(VM_LIB)
