@@ -1,30 +1,54 @@
 #include "minios/kernel.h"
 
-/*
- * LAB1 구현 안내
- * - mos_kernel_boot()에서 VM 생성, 커널 상태 전이, 하위 모듈 초기화 순서를 설계한다.
- * - boot를 두 번 호출하거나 shutdown 이후 다시 호출하는 정책을 명확히 정한다.
- * - 모든 포인터 인자와 VM API 반환값을 검사하고 실패 시 상태 코드를 반환한다.
- * - Copilot에게 "커널 lifecycle 상태 전이표를 기준으로 C99 구현"처럼 요청하면 좋다.
- */
+/* VM 에러 코드(vm_status_t)를 miniOS 에러 코드(mos_status_t)로 변환 */
+static mos_status_t vm_to_mos(vm_status_t s) {
+    switch (s) {
+    case VM_OK:        return MOS_OK;
+    case VM_ERR_NULL:  return MOS_ERR_NULL;
+    case VM_ERR_RANGE: return MOS_ERR_RANGE;
+    case VM_ERR_STATE: return MOS_ERR_STATE;
+    case VM_ERR_FULL:  return MOS_ERR_NO_SPACE;
+    default:           return MOS_ERR_INVALID;
+    }
+}
 
 mos_status_t mos_kernel_boot(mos_kernel_t *kernel) {
-    (void)kernel;
-    return MOS_ERR_UNIMPLEMENTED;
+    vm_status_t vs;
+    if (kernel == NULL) return MOS_ERR_NULL;
+    /* 초기화 안 된 구조체가 들어올 수 있으므로 BOOTED일 때만 거부 */
+    if (kernel->state == MOS_KERNEL_BOOTED) return MOS_ERR_STATE;
+
+    kernel->machine.impl = NULL;
+    kernel->private_state = NULL;
+    kernel->state = MOS_KERNEL_OFF;
+
+    vs = vm_machine_create(&kernel->machine);
+    if (vs != VM_OK) return vm_to_mos(vs);   /* 실패하면 OFF 유지 */
+
+    kernel->state = MOS_KERNEL_BOOTED;       /* VM 성공 후에만 전이 */
+    return MOS_OK;
 }
 
 mos_status_t mos_kernel_shutdown(mos_kernel_t *kernel) {
-    (void)kernel;
-    return MOS_ERR_UNIMPLEMENTED;
+    vm_status_t vs;
+    if (kernel == NULL) return MOS_ERR_NULL;
+    if (kernel->state != MOS_KERNEL_BOOTED) return MOS_ERR_STATE;
+
+    vs = vm_machine_destroy(&kernel->machine);
+    if (vs != VM_OK) return vm_to_mos(vs);
+
+    kernel->state = MOS_KERNEL_SHUTDOWN;
+    return MOS_OK;
 }
 
 mos_status_t mos_kernel_tick(mos_kernel_t *kernel) {
-    (void)kernel;
-    return MOS_ERR_UNIMPLEMENTED;
+    if (kernel == NULL) return MOS_ERR_NULL;
+    if (kernel->state != MOS_KERNEL_BOOTED) return MOS_ERR_STATE;
+    return vm_to_mos(vm_machine_tick(&kernel->machine));
 }
 
 mos_status_t mos_kernel_ticks(const mos_kernel_t *kernel, uint64_t *ticks_out) {
-    (void)kernel;
-    (void)ticks_out;
-    return MOS_ERR_UNIMPLEMENTED;
+    if (kernel == NULL || ticks_out == NULL) return MOS_ERR_NULL;
+    if (kernel->state != MOS_KERNEL_BOOTED) return MOS_ERR_STATE;
+    return vm_to_mos(vm_machine_get_ticks(&kernel->machine, ticks_out));
 }
